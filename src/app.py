@@ -9,7 +9,7 @@ import numpy as np
 model = joblib.load("../artifact/model_1w.pkl") 
 
 # Load raw dataset
-df = pd.read_csv("../Data/samsung_daily.csv")
+df = pd.read_csv("../Data/005930.KS_weekly.csv")
 
 app = dash.Dash(__name__)
 server = app.server
