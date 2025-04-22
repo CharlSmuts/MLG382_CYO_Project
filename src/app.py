@@ -5,8 +5,6 @@ import pandas as pd
 import joblib
 import numpy as np
 
-# Load trained model
-model = joblib.load("../artifact/model_1w.pkl") 
 
 # Load raw dataset
 df = pd.read_csv("../Data/005930.KS_weekly.csv")
@@ -44,15 +42,21 @@ app.layout = html.Div([
 def predict(n_clicks, weeks_ahead):
     if n_clicks == 0:
         return ""
+    #loads trained dataset
+    model = joblib.load(f"../artifact/model_{weeks_ahead}w.pkl")
+    # Load model for selected horizon
+    try:
+        model = joblib.load(f"../artifact/model_{weeks_ahead}w.pkl")
+    except FileNotFoundError:
+        return f"No model found for {weeks_ahead} week(s) ahead."
 
-    # Adjust features dynamically based on weeks_ahead
+    # Adjust feature windows
     window_short = 3 * weeks_ahead
     window_long = 5 * weeks_ahead
 
-    df_sorted = df.sort_values('Date')  # sorts dataset
+    df_sorted = df.sort_values('Date')
     df_latest = df_sorted.iloc[-1]
 
-    # Compute moving averages, stds, and returns from the dataset
     features = pd.DataFrame([{
         'Close_ma3': df_sorted['Close'].rolling(window_short).mean().iloc[-1],
         'Close_ma5': df_sorted['Close'].rolling(window_long).mean().iloc[-1],
@@ -60,8 +64,8 @@ def predict(n_clicks, weeks_ahead):
         'Volume_ma5': df_sorted['Volume'].rolling(window_long).mean().iloc[-1],
         'Close_std3': df_sorted['Close'].rolling(window_short).std().iloc[-1],
         'Close_std5': df_sorted['Close'].rolling(window_long).std().iloc[-1],
-        'Return_1w': df_sorted['Close'].pct_change(5 * 1).iloc[-1],
-        'Return_3w': df_sorted['Close'].pct_change(5 * 3).iloc[-1],
+        'Return_1w': df_sorted['Close'].pct_change(weeks_ahead).iloc[-1],
+        'Return_3w': df_sorted['Close'].pct_change(3 * weeks_ahead).iloc[-1],
         'Close': df_latest['Close'],
         'Open': df_latest['Open'],
         'High': df_latest['High'],
@@ -74,6 +78,3 @@ def predict(n_clicks, weeks_ahead):
 
     result = "⬆️ Price will go UP" if prediction == 1 else "⬇️ Price will go DOWN"
     return f"Prediction ({weeks_ahead} week(s) ahead): {result} (Confidence: {probability:.2%})"
-
-if __name__ == '__main__':
-    app.run_server(debug=True)
