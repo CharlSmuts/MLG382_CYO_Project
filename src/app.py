@@ -89,10 +89,10 @@ app.layout = html.Div([
 @app.callback(
     Output('prediction-output', 'children'),
     Input('SubmitInvestment', 'n_clicks'),
-    State('InitialInvestment', 'value'),
+    State('InitialInvestment', 'value'), # value
     State('timeScale', 'value'),
     State('InitialInvestmentDate', 'date'),
-    State('InvestmentPeriod', 'value')
+    State('InvestmentPeriod', 'value') # value
 )
 def update_prediction(n_clicks, investment, scale, date, period):
     if n_clicks > 0:
@@ -151,8 +151,8 @@ def update_prediction(n_clicks, investment, scale, date, period):
                 f"Your investment could be worth: ${future_value:,.2f}"
             )
 
-        except ValueError:
-            return "Please enter valid numeric values for investment and period."
+        #except ValueError:
+        #    return "Please enter valid numeric values for investment and period."
         except Exception as e:
             return f"Prediction error: {str(e)}"
 
