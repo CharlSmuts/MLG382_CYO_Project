@@ -136,7 +136,8 @@ def update_prediction(n_clicks, investment, scale, date, period):
                 input_seq = np.vstack((padding, input_seq))
 
             # Reshape for model input
-            input_seq = input_seq.reshape(1, lookback, len(feature_cols))
+            #input_seq = input_seq.reshape(1, lookback, len(feature_cols))
+            input_seq = input_seq.reshape(lookback, len(feature_cols))
 
             # Predict future Adj Close
             predicted_adj_close = model.predict(input_seq)[0][0]
