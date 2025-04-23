@@ -1,34 +1,32 @@
-#impoort Modules
+# Import Modules
 import dash
 from dash import html, dcc
 from dash.dependencies import Input, Output, State
 import pandas as pd
 from tensorflow.keras.models import load_model
 import numpy as np
-import datetime
+from datetime import datetime
 import joblib
 
-#load Raw data sets
+# Load Raw Datasets
 Daily_df = pd.read_csv("../Data/005930.KS.csv")
 Weekly_df = pd.read_csv("../Data/005930.KS_weekly.csv")
 Monthly_df = pd.read_csv("../Data/005930.KS_monthly.csv")
 
-# Convert 'Date' columns to datetime
+# Convert and Sort Dates
 Daily_df['Date'] = pd.to_datetime(Daily_df['Date'])
 Weekly_df['Date'] = pd.to_datetime(Weekly_df['Date'])
 Monthly_df['Date'] = pd.to_datetime(Monthly_df['Date'])
 
-# Sort by date just to be safe
 Daily_df.sort_values("Date", inplace=True)
 Weekly_df.sort_values("Date", inplace=True)
 Monthly_df.sort_values("Date", inplace=True)
 
-
-#Declare app
+# Declare app
 app = dash.Dash(__name__)
 server = app.server
 
-#Layout
+# Layout
 app.layout = html.Div([
     html.H1("Welcome to Samsung Stock Price Predictor", style={'color': '#0077cc'}),
 
@@ -51,7 +49,7 @@ app.layout = html.Div([
 
     html.Div([
         html.Label("Initial investment amount:"),
-        dcc.Input(id='InitialInvestment', type='number', placeholder='Enter amount', style={'width': '96.5%', 'padding': '8px'}),
+        dcc.Input(id='InitialInvestment', type='text', placeholder='Enter amount', style={'width': '96.5%', 'padding': '8px'}),
 
         html.Label("Select time scale:"),
         dcc.Dropdown(
@@ -72,7 +70,7 @@ app.layout = html.Div([
         ),
 
         html.Label("Investment period (in days/weeks/months):"),
-        dcc.Input(id='InvestmentPeriod', type='number', placeholder='Enter period', style={'width': '96.5%', 'padding': '8px'}),
+        dcc.Input(id='InvestmentPeriod', type='text', placeholder='Enter period', style={'width': '96.5%', 'padding': '8px'}),
 
         html.Button('Calculate Prediction', id='SubmitInvestment', n_clicks=0,
                     style={'marginTop': '10px', 'width': '100%', 'padding': '8px'}),
@@ -86,14 +84,15 @@ app.layout = html.Div([
     'margin': 'auto'
 })
 
-#Define Inputs and outputs
+
+# Callback
 @app.callback(
     Output('prediction-output', 'children'),
     Input('SubmitInvestment', 'n_clicks'),
-    State('InitialInvestment', 'value'), # value
+    State('InitialInvestment', 'value'),
     State('timeScale', 'value'),
     State('InitialInvestmentDate', 'date'),
-    State('InvestmentPeriod', 'value') # value
+    State('InvestmentPeriod', 'value')
 )
 def update_prediction(n_clicks, investment, scale, date, period):
     if n_clicks > 0:
@@ -102,76 +101,53 @@ def update_prediction(n_clicks, investment, scale, date, period):
             period = int(period)
             if not date:
                 return "Please select a valid start date."
-            
-            input_date = datetime.datetime.strptime(date, "%Y-%m-%d")
 
-            # Select dataset and model based on time scale
+            input_date = datetime.strptime(date, "%Y-%m-%d")
+
+            # Select dataset, model and lookback
             data_map = {
-    "Daily": {
-        "df": Daily_df,
-        "model": "../Artifact/Daily_stock_price_prediction_model_2.h5",
-        "scaler_X": "../Artifact/scaler_X_daily.pkl",
-        "scaler_y": "../Artifact/scaler_y_daily.pkl",
-        "lookback": 30
-    },
-    "Weekly": {
-        "df": Weekly_df,
-        "model": "../Artifact/Weekly_stock_price_prediction_model_2.h5",
-        "scaler_X": "../Artifact/scaler_X_weekly.pkl",
-        "scaler_y": "../Artifact/scaler_y_weekly.pkl",
-        "lookback": 12
-    },
-    "Monthly": {
-        "df": Monthly_df,
-        "model": "../Artifact/Monthly_stock_price_prediction_model_2.h5",
-        "scaler_X": "../Artifact/scaler_X_monthly.pkl",
-        "scaler_y": "../Artifact/scaler_y_monthly.pkl",
-        "lookback": 6
-    }
-}
+                "Daily": (Daily_df, "../Artifact/Daily_stock_price_prediction_model_2.h5", 30),
+                "Weekly": (Weekly_df, "../Artifact/Weekly_stock_price_prediction_model_2.h5", 12),
+                "Monthly": (Monthly_df, "../Artifact/Monthly_stock_price_prediction_model_2.h5", 6)
+            }
 
-            if scale not in data_map:
-                return f"No model/data available for scale '{scale}'."
+            df, model_path, lookback = data_map[scale]
+            model = load_model(model_path)
 
-            selected = data_map[scale]
-            df = selected["df"]
-            model = load_model(selected["model"])
-            scaler_X = joblib.load(selected["scaler_X"])
-            scaler_y = joblib.load(selected["scaler_y"])
-            lookback = selected["lookback"]
+            # Load scalers
+            scaler_X = joblib.load(f"../Artifact/{scale}_scaler_X.save")
+            scaler_y = joblib.load(f"../Artifact/{scale}_scaler_y.save")
 
-            # Find the closest available date
+            # Find closest available date
             closest_idx = df['Date'].sub(input_date).abs().idxmin()
             closest_row = df.loc[closest_idx]
             adj_close_at_date = closest_row['Adj Close']
-
-            # Calculate number of shares bought
             shares = investment / adj_close_at_date
 
-            # Prepare feature input sequence
+            # Feature preparation
             feature_cols = ['Open', 'High', 'Low', 'Volume']
             start_idx = max(0, closest_idx - lookback)
             input_seq = df[feature_cols].iloc[start_idx:closest_idx].values
 
-            # Pad sequence if too short
             if input_seq.shape[0] < lookback:
                 padding = np.zeros((lookback - input_seq.shape[0], len(feature_cols)))
                 input_seq = np.vstack((padding, input_seq))
 
-            # Scale input using the same scaler used during training
+            # Scale input
             input_seq_scaled = scaler_X.transform(input_seq)
+            assert input_seq_scaled.shape == (lookback, len(feature_cols))
 
-            # Make sure input shape is correct: (lookback, num_features)
-            assert input_seq_scaled.shape == (lookback, len(feature_cols)), \
-                f"Expected shape ({lookback}, {len(feature_cols)}), got {input_seq_scaled.shape}"
+            # Multi-step forecasting
+            seq = input_seq_scaled.copy()
+            for _ in range(period):
+                latest_input = seq[-lookback:].reshape(1, lookback, len(feature_cols))
+                scaled_prediction = model.predict(latest_input)
 
-            latest_input = input_seq_scaled[-1].reshape(1, -1)
+                # Fake feature row (same value for all 4 features)
+                next_row = np.array([scaled_prediction[0][0]] * len(feature_cols))
+                seq = np.vstack([seq, next_row])
 
-            # Predict scaled output and inverse-transform
-            scaled_prediction = model.predict(latest_input)
             predicted_adj_close = scaler_y.inverse_transform(scaled_prediction)[0][0]
-
-            # Final investment value
             future_value = predicted_adj_close * shares
 
             return (
@@ -181,9 +157,13 @@ def update_prediction(n_clicks, investment, scale, date, period):
                 f"Your investment could be worth: ${future_value:,.2f}"
             )
 
-        #except ValueError:
-        #    return "Please enter valid numeric values for investment and period."
+        except ValueError:
+            return "Please enter valid numeric values for investment and period."
         except Exception as e:
             return f"Prediction error: {str(e)}"
 
     return ""
+
+# Run the server
+if __name__ == '__main__':
+    app.run_server(debug=True)
