@@ -58,11 +58,13 @@ app.layout = html.Div([
         ),
 
         html.Label("Please select a date for the initial investment:"),
+        html.Br(),
         dcc.DatePickerSingle(
             id='InitialInvestmentDate',
             placeholder='Select a date',
             display_format='YYYY-MM-DD'
         ),
+        html.Br(),
 
         html.Label("Investment period (in days/weeks/months):"),
         dcc.Input(id='InvestmentPeriod', type='number', placeholder='Enter period', style={'width': '96.5%', 'padding': '8px'}),
@@ -79,7 +81,8 @@ app.layout = html.Div([
     'margin': 'auto'
 })
 
-# Define Inputs and outputs
+
+# Prediction callback
 @app.callback(
     Output('prediction-output', 'children'),
     Input('SubmitInvestment', 'n_clicks'),
@@ -95,17 +98,15 @@ def update_prediction(n_clicks, investment, scale, date, period):
             period = int(period)
             if not date:
                 return "Please select a valid start date."
-            
+
             input_date = datetime.datetime.strptime(date, "%Y-%m-%d")
 
-            # Time delta unit
             unit_map = {"Daily": "days", "Weekly": "weeks", "Monthly": "months"}
             if scale not in unit_map:
                 return f"No model/data available for scale '{scale}'."
-            
+
             unit = unit_map[scale]
 
-            # Load required items
             data_map = {
                 "Daily": {
                     "df": Daily_df,
@@ -121,7 +122,7 @@ def update_prediction(n_clicks, investment, scale, date, period):
                     "scaler_X": "../Artifact/scaler_X_monthly.pkl",
                     "scaler_y": "../Artifact/scaler_y_monthly.pkl",
                     "lookback": 6,
-                    "delta": pd.DateOffset(months=1)  # Special case for monthly
+                    "delta": pd.DateOffset(months=1)
                 }
             }
 
@@ -133,7 +134,6 @@ def update_prediction(n_clicks, investment, scale, date, period):
             lookback = selected["lookback"]
             delta = selected["delta"]
 
-            # Get start date data (closest in dataset)
             if input_date not in df['Date'].values:
                 closest_idx = df['Date'].sub(input_date).abs().idxmin()
             else:
@@ -152,7 +152,6 @@ def update_prediction(n_clicks, investment, scale, date, period):
 
             input_seq_scaled = scaler_X.transform(input_seq)
 
-            # Predict forward one step at a time
             current_date = df.loc[closest_idx, 'Date']
             target_date = (
                 current_date + period * delta if unit != "months"
@@ -160,17 +159,15 @@ def update_prediction(n_clicks, investment, scale, date, period):
             )
 
             for _ in range(period):
-                latest_input = input_seq_scaled.reshape(lookback, len(feature_cols))
+                latest_input = input_seq_scaled.reshape(1, lookback, len(feature_cols))
                 scaled_pred = model.predict(latest_input)
                 pred_price = scaler_y.inverse_transform(scaled_pred)[0][0]
 
-                # Simulate input for next prediction using previous output + repeat last volume
                 last_known_features = input_seq[-1].copy()
-                last_known_features[0:3] = pred_price  # Open, High, Low ≈ prediction
+                last_known_features[0:3] = pred_price
                 input_seq_scaled = np.vstack((input_seq_scaled, last_known_features))
                 input_seq_scaled = input_seq_scaled[-lookback:]
 
-                # Advance date
                 current_date += delta if unit != "months" else pd.DateOffset(months=1)
 
             final_value = pred_price * shares
@@ -188,3 +185,17 @@ def update_prediction(n_clicks, investment, scale, date, period):
             return f"Prediction error: {str(e)}"
 
     return ""
+
+
+# Graph toggle callback
+@app.callback(
+    [Output('Daily', 'style'),
+     Output('Monthly', 'style')],
+    Input('graphSelect', 'value')
+)
+def toggle_graph_visibility(selected_graph):
+    if selected_graph == 'Daily':
+        return {'display': 'block', 'width': '100%', 'marginTop': '20px'}, {'display': 'none'}
+    elif selected_graph == 'Monthly':
+        return {'display': 'none'}, {'display': 'block', 'width': '100%', 'marginTop': '20px'}
+    return {'display': 'none'}, {'display': 'none'}

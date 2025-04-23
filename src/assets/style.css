@@ -16,6 +16,13 @@ body {
     padding: 8px;
   }
   
+  #InitialInvestmentDate{
+    margin: 10px 0;
+    display: block;
+    width: 100%;
+    padding: 8px;
+  }
+  
   button:hover {
     background-color: #005fa3;
     color: white;
