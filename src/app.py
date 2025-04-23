@@ -6,11 +6,15 @@ import pandas as pd
 from tensorflow.keras.models import load_model
 import numpy as np
 import datetime
+import joblib
 
 #load Raw data sets
 Daily_df = pd.read_csv("../Data/005930.KS.csv")
 Weekly_df = pd.read_csv("../Data/005930.KS_weekly.csv")
 Monthly_df = pd.read_csv("../Data/005930.KS_monthly.csv")
+
+scaler_X = joblib.load("../Artifact/scaler_X.pkl")
+scaler_y = joblib.load("../Artifact/scaler_y.pkl")
 
 # Convert 'Date' columns to datetime
 Daily_df['Date'] = pd.to_datetime(Daily_df['Date'])
@@ -130,19 +134,25 @@ def update_prediction(n_clicks, investment, scale, date, period):
             start_idx = max(0, closest_idx - lookback)
             input_seq = df[feature_cols].iloc[start_idx:closest_idx].values
 
-            # Pad sequence if it's too short
+            # Pad sequence if too short
             if input_seq.shape[0] < lookback:
                 padding = np.zeros((lookback - input_seq.shape[0], len(feature_cols)))
                 input_seq = np.vstack((padding, input_seq))
 
-            # Reshape for model input
-            #input_seq = input_seq.reshape(1, lookback, len(feature_cols))
-            input_seq = input_seq.reshape(lookback, len(feature_cols))
+            # Scale input using the same scaler used during training
+            input_seq_scaled = scaler_X.transform(input_seq)
 
-            # Predict future Adj Close
-            predicted_adj_close = model.predict(input_seq)[0][0]
+            # Make sure input shape is correct: (lookback, num_features)
+            assert input_seq_scaled.shape == (lookback, len(feature_cols)), \
+                f"Expected shape ({lookback}, {len(feature_cols)}), got {input_seq_scaled.shape}"
 
-            # Calculate final investment value
+            latest_input = input_seq_scaled[-1].reshape(1, -1)
+
+            # Predict scaled output and inverse-transform
+            scaled_prediction = model.predict(latest_input)
+            predicted_adj_close = scaler_y.inverse_transform(scaled_prediction)[0][0]
+
+            # Final investment value
             future_value = predicted_adj_close * shares
 
             return (
