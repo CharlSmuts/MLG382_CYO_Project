@@ -1,4 +1,4 @@
-#impoort Modules
+# Import Modules
 import dash
 from dash import html, dcc
 from dash.dependencies import Input, Output, State
@@ -8,7 +8,7 @@ import numpy as np
 import datetime
 import joblib
 
-#load Raw data sets
+# Load Raw data sets
 Daily_df = pd.read_csv("../Data/005930.KS.csv")
 Weekly_df = pd.read_csv("../Data/005930.KS_weekly.csv")
 Monthly_df = pd.read_csv("../Data/005930.KS_monthly.csv")
@@ -23,12 +23,11 @@ Daily_df.sort_values("Date", inplace=True)
 Weekly_df.sort_values("Date", inplace=True)
 Monthly_df.sort_values("Date", inplace=True)
 
-
-#Declare app
+# Declare app
 app = dash.Dash(__name__)
 server = app.server
 
-#Layout
+# Layout
 app.layout = html.Div([
     html.H1("Welcome to Samsung Stock Price Predictor", style={'color': '#0077cc'}),
 
@@ -86,7 +85,7 @@ app.layout = html.Div([
     'margin': 'auto'
 })
 
-#Define Inputs and outputs
+# Define Inputs and outputs
 @app.callback(
     Output('prediction-output', 'children'),
     Input('SubmitInvestment', 'n_clicks'),
@@ -112,21 +111,24 @@ def update_prediction(n_clicks, investment, scale, date, period):
         "model": "../Artifact/Daily_stock_price_prediction_model_2.h5",
         "scaler_X": "../Artifact/scaler_X_daily.pkl",
         "scaler_y": "../Artifact/scaler_y_daily.pkl",
-        "lookback": 30
+        "lookback": 30,
+        "date_increment": datetime.timedelta(days=1)
     },
     "Weekly": {
         "df": Weekly_df,
         "model": "../Artifact/Weekly_stock_price_prediction_model_2.h5",
         "scaler_X": "../Artifact/scaler_X_weekly.pkl",
         "scaler_y": "../Artifact/scaler_y_weekly.pkl",
-        "lookback": 12
+        "lookback": 12,
+        "date_increment": datetime.timedelta(weeks=1)
     },
     "Monthly": {
         "df": Monthly_df,
         "model": "../Artifact/Monthly_stock_price_prediction_model_2.h5",
         "scaler_X": "../Artifact/scaler_X_monthly.pkl",
         "scaler_y": "../Artifact/scaler_y_monthly.pkl",
-        "lookback": 6
+        "lookback": 6,
+        "date_increment": datetime.timedelta(weeks=4)  # approx 1 month
     }
 }
 
@@ -139,6 +141,7 @@ def update_prediction(n_clicks, investment, scale, date, period):
             scaler_X = joblib.load(selected["scaler_X"])
             scaler_y = joblib.load(selected["scaler_y"])
             lookback = selected["lookback"]
+            date_increment = selected["date_increment"]
 
             # Find the closest available date
             closest_idx = df['Date'].sub(input_date).abs().idxmin()
@@ -167,24 +170,40 @@ def update_prediction(n_clicks, investment, scale, date, period):
 
             latest_input = input_seq_scaled[-1].reshape(1, -1)
 
-            # Predict scaled output and inverse-transform
-            scaled_prediction = model.predict(latest_input)
-            predicted_adj_close = scaler_y.inverse_transform(scaled_prediction)[0][0]
+            # Loop to predict until reaching the target date
+            current_date = closest_row['Date']
+            future_date = input_date + date_increment * period
+            predicted_price = adj_close_at_date
+            total_shares = shares
+
+            while current_date < future_date:
+                # Predict the next price
+                scaled_prediction = model.predict(latest_input)
+                predicted_adj_close = scaler_y.inverse_transform(scaled_prediction)[0][0]
+
+                # Update the current date
+                current_date += date_increment
+                predicted_price = predicted_adj_close
+
+                # Prepare input for the next prediction
+                input_seq = np.roll(input_seq, -1, axis=0)
+                input_seq[-1] = np.array([df.loc[df['Date'] == current_date, feature_cols].values[0]])
+                input_seq_scaled = scaler_X.transform(input_seq)
+
+                latest_input = input_seq_scaled[-1].reshape(1, -1)
 
             # Final investment value
-            future_value = predicted_adj_close * shares
+            future_value = predicted_price * total_shares
 
             return html.Div([
                 f"On {closest_row['Date'].date()}, you could buy {shares:.2f} shares at "
                 f"${adj_close_at_date:.2f} each.",
                 html.Br(),
-                f"Predicted Adj Close after {period} {scale.lower()}(s): ${predicted_adj_close:.2f}",
+                f"Predicted Adj Close after {period} {scale.lower()}(s): ${predicted_price:.2f}",
                 html.Br(),
                 f"Your investment could be worth: ${future_value:,.2f}"
             ])
 
-        #except ValueError:
-        #    return "Please enter valid numeric values for investment and period."
         except Exception as e:
             return f"Prediction error: {str(e)}"
 
