@@ -13,9 +13,6 @@ Daily_df = pd.read_csv("../Data/005930.KS.csv")
 Weekly_df = pd.read_csv("../Data/005930.KS_weekly.csv")
 Monthly_df = pd.read_csv("../Data/005930.KS_monthly.csv")
 
-scaler_X = joblib.load("../Artifact/scaler_X.pkl")
-scaler_y = joblib.load("../Artifact/scaler_y.pkl")
-
 # Convert 'Date' columns to datetime
 Daily_df['Date'] = pd.to_datetime(Daily_df['Date'])
 Weekly_df['Date'] = pd.to_datetime(Weekly_df['Date'])
@@ -110,16 +107,38 @@ def update_prediction(n_clicks, investment, scale, date, period):
 
             # Select dataset and model based on time scale
             data_map = {
-                "Daily": (Daily_df, "../Artifact/Daily_stock_price_prediction_model_2.h5", 30),
-                "Weekly": (Weekly_df, "../Artifact/Weekly_stock_price_prediction_model_2.h5", 12),
-                "Monthly": (Monthly_df, "../Artifact/Monthly_stock_price_prediction_model_2.h5", 6)
-            }
+    "Daily": {
+        "df": Daily_df,
+        "model": "../Artifact/Daily_stock_price_prediction_model_2.h5",
+        "scaler_X": "../Artifact/scaler_X_daily.pkl",
+        "scaler_y": "../Artifact/scaler_y_daily.pkl",
+        "lookback": 30
+    },
+    "Weekly": {
+        "df": Weekly_df,
+        "model": "../Artifact/Weekly_stock_price_prediction_model_2.h5",
+        "scaler_X": "../Artifact/scaler_X_weekly.pkl",
+        "scaler_y": "../Artifact/scaler_y_weekly.pkl",
+        "lookback": 12
+    },
+    "Monthly": {
+        "df": Monthly_df,
+        "model": "../Artifact/Monthly_stock_price_prediction_model_2.h5",
+        "scaler_X": "../Artifact/scaler_X_monthly.pkl",
+        "scaler_y": "../Artifact/scaler_y_monthly.pkl",
+        "lookback": 6
+    }
+}
 
             if scale not in data_map:
                 return f"No model/data available for scale '{scale}'."
 
-            df, model_path, lookback = data_map[scale]
-            model = load_model(model_path)
+            selected = data_map[scale]
+            df = selected["df"]
+            model = load_model(selected["model"])
+            scaler_X = joblib.load(selected["scaler_X"])
+            scaler_y = joblib.load(selected["scaler_y"])
+            lookback = selected["lookback"]
 
             # Find the closest available date
             closest_idx = df['Date'].sub(input_date).abs().idxmin()
