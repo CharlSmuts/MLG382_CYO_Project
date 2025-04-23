@@ -82,6 +82,19 @@ app.layout = html.Div([
 })
 
 
+# Update DatePicker max date based on timeScale
+@app.callback(
+    Output('InitialInvestmentDate', 'max_date_allowed'),
+    Input('timeScale', 'value')
+)
+def update_max_date(scale):
+    if scale == 'Daily':
+        return Daily_df['Date'].max().date()
+    elif scale == 'Monthly':
+        return Monthly_df['Date'].max().date()
+    return datetime.date.today()
+
+
 # Prediction callback
 @app.callback(
     Output('prediction-output', 'children'),
@@ -134,6 +147,9 @@ def update_prediction(n_clicks, investment, scale, date, period):
             lookback = selected["lookback"]
             delta = selected["delta"]
 
+            if input_date > df['Date'].max():
+                return f"Please choose a date on or before {df['Date'].max().date()}."
+
             if input_date not in df['Date'].values:
                 closest_idx = df['Date'].sub(input_date).abs().idxmin()
             else:
@@ -153,11 +169,6 @@ def update_prediction(n_clicks, investment, scale, date, period):
             input_seq_scaled = scaler_X.transform(input_seq)
 
             current_date = df.loc[closest_idx, 'Date']
-            target_date = (
-                current_date + period * delta if unit != "months"
-                else current_date + pd.DateOffset(months=period)
-            )
-
             for _ in range(period):
                 latest_input = input_seq_scaled.reshape(lookback, len(feature_cols))
                 scaled_pred = model.predict(latest_input)
