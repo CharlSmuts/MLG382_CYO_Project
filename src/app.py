@@ -12,6 +12,11 @@ Daily_df = pd.read_csv("../Data/005930.KS.csv")
 Weekly_df = pd.read_csv("../Data/005930.KS_weekly.csv")
 Monthly_df = pd.read_csv("../Data/005930.KS_monthly.csv")
 
+# Convert 'Date' columns to datetime
+Daily_df['Date'] = pd.to_datetime(Daily_df['Date'])
+Weekly_df['Date'] = pd.to_datetime(Weekly_df['Date'])
+Monthly_df['Date'] = pd.to_datetime(Monthly_df['Date'])
+
 # Sort by date just to be safe
 Daily_df.sort_values("Date", inplace=True)
 Weekly_df.sort_values("Date", inplace=True)
