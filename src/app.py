@@ -7,7 +7,7 @@ import numpy as np
 
 
 # Load raw dataset
-df = pd.read_csv("../Data/005930.KS_weekly.csv")
+df = pd.read_csv("../Data/005930.KS.csv")
 
 app = dash.Dash(__name__)
 server = app.server
