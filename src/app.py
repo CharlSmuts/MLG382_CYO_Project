@@ -26,7 +26,7 @@ server = app.server
 
 # Layout
 app.layout = html.Div([
-    html.H1("Welcome to Samsung Stock Price Predictor", style={'color': '#0077cc'}),
+    html.H1("Welcome to the Samsung Stock Price Predictor", style={'color': '#0077cc'}),
 
     html.Label("Select Graph:"),
     dcc.Dropdown(
@@ -66,7 +66,7 @@ app.layout = html.Div([
         ),
         html.Br(),
 
-        html.Label("Investment period (in days/weeks/months):"),
+        html.Label("Investment period (in days/months, Max 30 days/5 months):"),
         dcc.Input(id='InvestmentPeriod', type='number', placeholder='Enter period', style={'width': '96.5%', 'padding': '8px'}),
 
         html.Button('Calculate Prediction', id='SubmitInvestment', n_clicks=0,
@@ -109,6 +109,13 @@ def update_prediction(n_clicks, investment, scale, date, period):
         try:
             investment = float(investment)
             period = int(period)
+
+            if scale == "Daily" and period > 30:
+                period = 30
+            elif scale == "Monthly" and period > 5:
+                period = 5
+
+
             if not date:
                 return "Please select a valid start date."
 
