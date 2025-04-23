@@ -174,7 +174,7 @@ def update_prediction(n_clicks, investment, scale, date, period):
             )
 
             for _ in range(period):
-                latest_input = input_seq_scaled[-lookback:].reshape(1, lookback, len(feature_cols))
+                latest_input = input_seq_scaled[-1].reshape(1, len(feature_cols))
                 scaled_pred = model.predict(latest_input)
                 pred_price = scaler_y.inverse_transform(scaled_pred)[0][0]
 
