@@ -10,17 +10,14 @@ import joblib
 
 # Load Raw data sets
 Daily_df = pd.read_csv("../Data/005930.KS.csv")
-Weekly_df = pd.read_csv("../Data/005930.KS_weekly.csv")
 Monthly_df = pd.read_csv("../Data/005930.KS_monthly.csv")
 
 # Convert 'Date' columns to datetime
 Daily_df['Date'] = pd.to_datetime(Daily_df['Date'])
-Weekly_df['Date'] = pd.to_datetime(Weekly_df['Date'])
 Monthly_df['Date'] = pd.to_datetime(Monthly_df['Date'])
 
 # Sort by date just to be safe
 Daily_df.sort_values("Date", inplace=True)
-Weekly_df.sort_values("Date", inplace=True)
 Monthly_df.sort_values("Date", inplace=True)
 
 # Declare app
@@ -36,16 +33,14 @@ app.layout = html.Div([
         id='graphSelect',
         options=[
             {'label': 'Daily', 'value': 'Daily'},
-            {'label': 'Weekly', 'value': 'Weekly'},
             {'label': 'Monthly', 'value': 'Monthly'}
         ],
         value='Daily'
     ),
 
     html.Div([
-        html.Img(id='Daily', src='/assets/DailyGraph.png', style={'display': 'none', 'width': '100%', 'marginTop': '20px'}),
-        html.Img(id='Weekly', src='/assets/WeeklyGraph.png', style={'display': 'none', 'width': '100%', 'marginTop': '20px'}),
-        html.Img(id='Monthly', src='/assets/MonthlyGraph.png', style={'display': 'none', 'width': '100%', 'marginTop': '20px'}),
+        html.Img(id='Daily', src='assets/DailyGraph.png', style={'display': 'none', 'width': '100%', 'marginTop': '20px'}),
+        html.Img(id='Monthly', src='assets/MonthlyGraph.png', style={'display': 'none', 'width': '100%', 'marginTop': '20px'}),
     ], id='graphs'),
 
     html.Div([
@@ -57,7 +52,6 @@ app.layout = html.Div([
             id='timeScale',
             options=[
                 {'label': 'Daily', 'value': 'Daily'},
-                {'label': 'Weekly', 'value': 'Weekly'},
                 {'label': 'Monthly', 'value': 'Monthly'}
             ],
             value='Daily'
@@ -121,14 +115,6 @@ def update_prediction(n_clicks, investment, scale, date, period):
                     "lookback": 30,
                     "delta": datetime.timedelta(days=1)
                 },
-                "Weekly": {
-                    "df": Weekly_df,
-                    "model": "../Artifact/Weekly_stock_price_prediction_model_2.h5",
-                    "scaler_X": "../Artifact/scaler_X_weekly.pkl",
-                    "scaler_y": "../Artifact/scaler_y_weekly.pkl",
-                    "lookback": 12,
-                    "delta": datetime.timedelta(weeks=1)
-                },
                 "Monthly": {
                     "df": Monthly_df,
                     "model": "../Artifact/Monthly_stock_price_prediction_model_2.h5",
@@ -174,7 +160,7 @@ def update_prediction(n_clicks, investment, scale, date, period):
             )
 
             for _ in range(period):
-                latest_input = input_seq_scaled.reshape(lookback, len(feature_cols))
+                latest_input = input_seq_scaled[-1].reshape(1, len(feature_cols))
                 scaled_pred = model.predict(latest_input)
                 pred_price = scaler_y.inverse_transform(scaled_pred)[0][0]
 
