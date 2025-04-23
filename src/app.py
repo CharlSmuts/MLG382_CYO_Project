@@ -50,7 +50,7 @@ app.layout = html.Div([
 
     html.Div([
         html.Label("Initial investment amount:"),
-        dcc.Input(id='InitialInvestment', type='text', placeholder='Enter amount', style={'width': '96.5%', 'padding': '8px'}),
+        dcc.Input(id='InitialInvestment', type='number', placeholder='Enter amount', style={'width': '96.5%', 'padding': '8px'}),
 
         html.Label("Select time scale:"),
         dcc.Dropdown(
@@ -71,7 +71,7 @@ app.layout = html.Div([
         ),
 
         html.Label("Investment period (in days/weeks/months):"),
-        dcc.Input(id='InvestmentPeriod', type='text', placeholder='Enter period', style={'width': '96.5%', 'padding': '8px'}),
+        dcc.Input(id='InvestmentPeriod', type='number', placeholder='Enter period', style={'width': '96.5%', 'padding': '8px'}),
 
         html.Button('Calculate Prediction', id='SubmitInvestment', n_clicks=0,
                     style={'marginTop': '10px', 'width': '100%', 'padding': '8px'}),
