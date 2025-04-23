@@ -97,7 +97,7 @@ def update_prediction(n_clicks, investment, scale, date, period):
             if not date:
                 return "Please select a valid start date."
             
-            input_date = datetime.strptime(date, "%Y-%m-%d")
+            input_date = datetime.datetime.strptime(date, "%Y-%m-%d")
 
             # Select dataset and model based on time scale
             data_map = {
