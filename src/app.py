@@ -174,12 +174,14 @@ def update_prediction(n_clicks, investment, scale, date, period):
             # Final investment value
             future_value = predicted_adj_close * shares
 
-            return (
+            return html.Div([
                 f"On {closest_row['Date'].date()}, you could buy {shares:.2f} shares at "
-                f"${adj_close_at_date:.2f} each.\n"
-                f"Predicted Adj Close after {period} {scale.lower()}(s): ${predicted_adj_close:.2f}\n"
+                f"${adj_close_at_date:.2f} each.",
+                html.Br(),
+                f"Predicted Adj Close after {period} {scale.lower()}(s): ${predicted_adj_close:.2f}",
+                html.Br(),
                 f"Your investment could be worth: ${future_value:,.2f}"
-            )
+            ])
 
         #except ValueError:
         #    return "Please enter valid numeric values for investment and period."
