@@ -115,8 +115,8 @@ def update_prediction(n_clicks, investment, scale, date, period):
             model = load_model(model_path)
 
             # Load scalers
-            scaler_X = joblib.load(f"../Artifact/{scale}_scaler_X.save")
-            scaler_y = joblib.load(f"../Artifact/{scale}_scaler_y.save")
+            scaler_X = joblib.load(f"../Artifact/scaler_X_{scale}.pkl")
+            scaler_y = joblib.load(f"../Artifact/scaler_y_{scale}.pk")
 
             # Find closest available date
             closest_idx = df['Date'].sub(input_date).abs().idxmin()
