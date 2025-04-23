@@ -1,0 +1,7 @@
+dash
+pandas
+scikit-learn
+joblib
+numpy
+gunicorn
+tensorflow

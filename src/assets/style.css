@@ -1,0 +1,47 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    max-width: 600px;
+    margin: auto;
+  }
+  
+  h1 {
+    color: #0077cc;
+  }
+  
+  select, button {
+    margin: 10px 0;
+    display: block;
+    width: 100%;
+    padding: 8px;
+  }
+  
+  #InitialInvestmentDate{
+    margin: 10px 0;
+    display: block;
+    width: 100%;
+    padding: 8px;
+  }
+  
+  button:hover {
+    background-color: #005fa3;
+    color: white;
+  }
+  
+  input[type="text"] {
+    margin: 10px 0;
+    display: block;
+    width: 96.5%;
+    padding: 8px;
+  }
+  
+  #graphs img {
+    display: none;
+    width: 100%;
+    margin-top: 20px;
+  }
+  
+  #PredictionBox {
+    margin-top: 30px;
+  }
+  
