@@ -21,10 +21,10 @@ app.layout = html.Div([
         dcc.Slider(
             id='weeks-slider',
             min=1,
-            max=8,
+            max=4,
             step=1,
             value=1,
-            marks={i: f"{i}w" for i in range(1, 9)},
+            marks={i: f"{i}w" for i in range(1, 5)},
         ),
     ], style={'margin': '20px'}),
 
@@ -42,8 +42,7 @@ app.layout = html.Div([
 def predict(n_clicks, weeks_ahead):
     if n_clicks == 0:
         return ""
-    #loads trained dataset
-    model = joblib.load(f"../artifact/model_{weeks_ahead}w.pkl")
+
     # Load model for selected horizon
     try:
         model = joblib.load(f"../artifact/model_{weeks_ahead}w.pkl")
