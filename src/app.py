@@ -89,10 +89,10 @@ app.layout = html.Div([
 @app.callback(
     Output('prediction-output', 'children'),
     Input('SubmitInvestment', 'n_clicks'),
-    State('InitialInvestment', 'value'), # value
+    State('InitialInvestment', 'value'),
     State('timeScale', 'value'),
     State('InitialInvestmentDate', 'date'),
-    State('InvestmentPeriod', 'value') # value
+    State('InvestmentPeriod', 'value')
 )
 def update_prediction(n_clicks, investment, scale, date, period):
     if n_clicks > 0:
@@ -104,36 +104,40 @@ def update_prediction(n_clicks, investment, scale, date, period):
             
             input_date = datetime.datetime.strptime(date, "%Y-%m-%d")
 
-            # Select dataset and model based on time scale
-            data_map = {
-    "Daily": {
-        "df": Daily_df,
-        "model": "../Artifact/Daily_stock_price_prediction_model_2.h5",
-        "scaler_X": "../Artifact/scaler_X_daily.pkl",
-        "scaler_y": "../Artifact/scaler_y_daily.pkl",
-        "lookback": 30,
-        "date_increment": datetime.timedelta(days=1)
-    },
-    "Weekly": {
-        "df": Weekly_df,
-        "model": "../Artifact/Weekly_stock_price_prediction_model_2.h5",
-        "scaler_X": "../Artifact/scaler_X_weekly.pkl",
-        "scaler_y": "../Artifact/scaler_y_weekly.pkl",
-        "lookback": 12,
-        "date_increment": datetime.timedelta(weeks=1)
-    },
-    "Monthly": {
-        "df": Monthly_df,
-        "model": "../Artifact/Monthly_stock_price_prediction_model_2.h5",
-        "scaler_X": "../Artifact/scaler_X_monthly.pkl",
-        "scaler_y": "../Artifact/scaler_y_monthly.pkl",
-        "lookback": 6,
-        "date_increment": datetime.timedelta(weeks=4)  # approx 1 month
-    }
-}
-
-            if scale not in data_map:
+            # Time delta unit
+            unit_map = {"Daily": "days", "Weekly": "weeks", "Monthly": "months"}
+            if scale not in unit_map:
                 return f"No model/data available for scale '{scale}'."
+            
+            unit = unit_map[scale]
+
+            # Load required items
+            data_map = {
+                "Daily": {
+                    "df": Daily_df,
+                    "model": "../Artifact/Daily_stock_price_prediction_model_2.h5",
+                    "scaler_X": "../Artifact/scaler_X_daily.pkl",
+                    "scaler_y": "../Artifact/scaler_y_daily.pkl",
+                    "lookback": 30,
+                    "delta": datetime.timedelta(days=1)
+                },
+                "Weekly": {
+                    "df": Weekly_df,
+                    "model": "../Artifact/Weekly_stock_price_prediction_model_2.h5",
+                    "scaler_X": "../Artifact/scaler_X_weekly.pkl",
+                    "scaler_y": "../Artifact/scaler_y_weekly.pkl",
+                    "lookback": 12,
+                    "delta": datetime.timedelta(weeks=1)
+                },
+                "Monthly": {
+                    "df": Monthly_df,
+                    "model": "../Artifact/Monthly_stock_price_prediction_model_2.h5",
+                    "scaler_X": "../Artifact/scaler_X_monthly.pkl",
+                    "scaler_y": "../Artifact/scaler_y_monthly.pkl",
+                    "lookback": 6,
+                    "delta": pd.DateOffset(months=1)  # Special case for monthly
+                }
+            }
 
             selected = data_map[scale]
             df = selected["df"]
@@ -141,67 +145,57 @@ def update_prediction(n_clicks, investment, scale, date, period):
             scaler_X = joblib.load(selected["scaler_X"])
             scaler_y = joblib.load(selected["scaler_y"])
             lookback = selected["lookback"]
-            date_increment = selected["date_increment"]
+            delta = selected["delta"]
 
-            # Find the closest available date
-            closest_idx = df['Date'].sub(input_date).abs().idxmin()
+            # Get start date data (closest in dataset)
+            if input_date not in df['Date'].values:
+                closest_idx = df['Date'].sub(input_date).abs().idxmin()
+            else:
+                closest_idx = df[df['Date'] == input_date].index[0]
+
             closest_row = df.loc[closest_idx]
             adj_close_at_date = closest_row['Adj Close']
-
-            # Calculate number of shares bought
             shares = investment / adj_close_at_date
 
-            # Prepare feature input sequence
             feature_cols = ['Open', 'High', 'Low', 'Volume']
-            start_idx = max(0, closest_idx - lookback)
-            input_seq = df[feature_cols].iloc[start_idx:closest_idx].values
+            input_seq = df[feature_cols].iloc[closest_idx - lookback:closest_idx].values
 
-            # Pad sequence if too short
             if input_seq.shape[0] < lookback:
                 padding = np.zeros((lookback - input_seq.shape[0], len(feature_cols)))
                 input_seq = np.vstack((padding, input_seq))
 
-            # Scale input using the same scaler used during training
             input_seq_scaled = scaler_X.transform(input_seq)
 
-            # Make sure input shape is correct: (lookback, num_features)
-            assert input_seq_scaled.shape == (lookback, len(feature_cols)), \
-                f"Expected shape ({lookback}, {len(feature_cols)}), got {input_seq_scaled.shape}"
+            # Predict forward one step at a time
+            current_date = df.loc[closest_idx, 'Date']
+            target_date = (
+                current_date + period * delta if unit != "months"
+                else current_date + pd.DateOffset(months=period)
+            )
 
-            latest_input = input_seq_scaled[-1].reshape(1, -1)
+            for _ in range(period):
+                latest_input = input_seq_scaled[-lookback:].reshape(1, lookback, len(feature_cols))
+                scaled_pred = model.predict(latest_input)
+                pred_price = scaler_y.inverse_transform(scaled_pred)[0][0]
 
-            # Loop to predict until reaching the target date
-            current_date = closest_row['Date']
-            future_date = input_date + date_increment * period
-            predicted_price = adj_close_at_date
-            total_shares = shares
+                # Simulate input for next prediction using previous output + repeat last volume
+                last_known_features = input_seq[-1].copy()
+                last_known_features[0:3] = pred_price  # Open, High, Low ≈ prediction
+                input_seq_scaled = np.vstack((input_seq_scaled, last_known_features))
+                input_seq_scaled = input_seq_scaled[-lookback:]
 
-            while current_date < future_date:
-                # Predict the next price
-                scaled_prediction = model.predict(latest_input)
-                predicted_adj_close = scaler_y.inverse_transform(scaled_prediction)[0][0]
+                # Advance date
+                current_date += delta if unit != "months" else pd.DateOffset(months=1)
 
-                # Update the current date
-                current_date += date_increment
-                predicted_price = predicted_adj_close
-
-                # Prepare input for the next prediction
-                input_seq = np.roll(input_seq, -1, axis=0)
-                input_seq[-1] = np.array([df.loc[df['Date'] == current_date, feature_cols].values[0]])
-                input_seq_scaled = scaler_X.transform(input_seq)
-
-                latest_input = input_seq_scaled[-1].reshape(1, -1)
-
-            # Final investment value
-            future_value = predicted_price * total_shares
+            final_value = pred_price * shares
 
             return html.Div([
                 f"On {closest_row['Date'].date()}, you could buy {shares:.2f} shares at "
                 f"${adj_close_at_date:.2f} each.",
                 html.Br(),
-                f"Predicted Adj Close after {period} {scale.lower()}(s): ${predicted_price:.2f}",
+                f"Predicted Adj Close on {current_date.date()}: ${pred_price:.2f}",
                 html.Br(),
-                f"Your investment could be worth: ${future_value:,.2f}"
+                f"Your investment could be worth: ${final_value:,.2f}"
             ])
 
         except Exception as e:
